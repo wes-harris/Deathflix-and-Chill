@@ -50,4 +50,3 @@ export default tseslint.config({
 ```
 
 //
-// Hi, Matt!
