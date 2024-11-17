@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DeathflixAPI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+53b9ee1901d4d89408af060c8562c70bd50f4c71")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+cda33f6c2c49d8732a9108d3fc3693cfd6890e6f")]
 [assembly: System.Reflection.AssemblyProductAttribute("DeathflixAPI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DeathflixAPI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

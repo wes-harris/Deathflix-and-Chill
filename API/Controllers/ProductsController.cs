@@ -9,8 +9,6 @@ public class ProductsController : ControllerBase
 {
     private readonly AppDbContext _context;
 
-    public object EntityFrameworkCore { get; private set; }
-
     public ProductsController(AppDbContext context)
     {
         _context = context;
