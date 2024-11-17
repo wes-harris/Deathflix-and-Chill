@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "YecbyFtRgIxjsMYXP6WbYKvWkvQFx6Avch6+KDF1lEI=",
+  "Source": "DeathflixAPI",
+  "BasePath": "_content/DeathflixAPI",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

@@ -1,0 +1,6 @@
+@DeathflixAPI_HostAddress = http://localhost:5243
+
+GET {{DeathflixAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
