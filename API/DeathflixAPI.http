@@ -1,6 +1,11 @@
-@DeathflixAPI_HostAddress = http://localhost:5243
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
-GET {{DeathflixAPI_HostAddress}}/weatherforecast/
-Accept: application/json
+app.UseHttpsRedirection();
+app.UseAuthorization();
+app.MapControllers();
 
-###
+app.Run();
