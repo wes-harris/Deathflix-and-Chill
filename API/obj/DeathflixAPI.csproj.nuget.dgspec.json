@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\Wesley\\desktop\\code\\deathflix-and-chill\\api\\DeathflixAPI.csproj": {}
+    "C:\\Users\\Wesley\\Desktop\\Code\\Deathflix-and-Chill\\API\\DeathflixAPI.csproj": {}
   },
   "projects": {
-    "C:\\Users\\Wesley\\desktop\\code\\deathflix-and-chill\\api\\DeathflixAPI.csproj": {
+    "C:\\Users\\Wesley\\Desktop\\Code\\Deathflix-and-Chill\\API\\DeathflixAPI.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Wesley\\desktop\\code\\deathflix-and-chill\\api\\DeathflixAPI.csproj",
+        "projectUniqueName": "C:\\Users\\Wesley\\Desktop\\Code\\Deathflix-and-Chill\\API\\DeathflixAPI.csproj",
         "projectName": "DeathflixAPI",
-        "projectPath": "C:\\Users\\Wesley\\desktop\\code\\deathflix-and-chill\\api\\DeathflixAPI.csproj",
+        "projectPath": "C:\\Users\\Wesley\\Desktop\\Code\\Deathflix-and-Chill\\API\\DeathflixAPI.csproj",
         "packagesPath": "C:\\Users\\Wesley\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Wesley\\desktop\\code\\deathflix-and-chill\\api\\obj\\",
+        "outputPath": "C:\\Users\\Wesley\\Desktop\\Code\\Deathflix-and-Chill\\API\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Wesley\\AppData\\Roaming\\NuGet\\NuGet.Config",

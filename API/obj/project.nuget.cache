@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "6MozddWR18Y=",
+  "dgSpecHash": "CP4EdkhkOV8=",
   "success": true,
-  "projectFilePath": "C:\\Users\\Wesley\\desktop\\code\\deathflix-and-chill\\api\\DeathflixAPI.csproj",
+  "projectFilePath": "C:\\Users\\Wesley\\Desktop\\Code\\Deathflix-and-Chill\\API\\DeathflixAPI.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Wesley\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
     "C:\\Users\\Wesley\\.nuget\\packages\\microsoft.bcl.asyncinterfaces\\6.0.0\\microsoft.bcl.asyncinterfaces.6.0.0.nupkg.sha512",
