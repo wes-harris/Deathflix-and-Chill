@@ -3,56 +3,56 @@ using DeathflixAPI.Models;
 
 namespace DeathflixAPI.Data;
 
-public class ApplicationDbContext : DbContext
+public class AppDbContext : DbContext
 {
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+    // Constructor that takes DbContext options
+    // This is where database connection settings will be passed in
+    public AppDbContext(DbContextOptions<AppDbContext> options)
         : base(options)
     {
     }
 
-    public DbSet<Actor> Actors => Set<Actor>();
-    public DbSet<DeathRecord> DeathRecords => Set<DeathRecord>();
-    public DbSet<Movie> Movies => Set<Movie>();
-    public DbSet<MovieCredit> MovieCredits => Set<MovieCredit>();
+    // DbSet properties - these represent our database tables
+    public DbSet<Actor> Actors { get; set; }
+    public DbSet<Movie> Movies { get; set; }
+    public DbSet<MovieCredit> MovieCredits { get; set; }
+    public DbSet<DeathRecord> DeathRecords { get; set; }
 
+    // This method lets us configure additional model relationships and database rules
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // Configure relationships
+        // Configure one-to-one relationship between Actor and DeathRecord
         modelBuilder.Entity<Actor>()
             .HasOne(a => a.DeathRecord)
             .WithOne(d => d.Actor)
-            .HasForeignKey<DeathRecord>(d => d.ActorId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .HasForeignKey<DeathRecord>(d => d.ActorId);
 
-        modelBuilder.Entity<MovieCredit>()
-            .HasOne(mc => mc.Actor)
-            .WithMany(a => a.MovieCredits)
+        // Configure one-to-many relationship between Actor and MovieCredit
+        modelBuilder.Entity<Actor>()
+            .HasMany(a => a.MovieCredits)
+            .WithOne(mc => mc.Actor)
             .HasForeignKey(mc => mc.ActorId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        modelBuilder.Entity<MovieCredit>()
-            .HasOne(mc => mc.Movie)
-            .WithMany(m => m.Credits)
+        // Configure one-to-many relationship between Movie and MovieCredit
+        modelBuilder.Entity<Movie>()
+            .HasMany(m => m.Credits)
+            .WithOne(mc => mc.Movie)
             .HasForeignKey(mc => mc.MovieId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Configure audit properties
+        // Add indexes for better query performance
         modelBuilder.Entity<Actor>()
-            .Property(e => e.CreatedAt)
-            .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            .HasIndex(a => a.TmdbId)
+            .IsUnique();
+
+        modelBuilder.Entity<Movie>()
+            .HasIndex(m => m.TmdbId)
+            .IsUnique();
 
         modelBuilder.Entity<Actor>()
-            .Property(e => e.UpdatedAt)
-            .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-        modelBuilder.Entity<DeathRecord>()
-            .Property(e => e.CreatedAt)
-            .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-        modelBuilder.Entity<DeathRecord>()
-            .Property(e => e.UpdatedAt)
-            .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            .HasIndex(a => a.DateOfDeath);
     }
 }
