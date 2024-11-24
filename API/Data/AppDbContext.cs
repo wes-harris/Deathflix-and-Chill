@@ -43,16 +43,42 @@ public class AppDbContext : DbContext
             .HasForeignKey(mc => mc.MovieId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Add indexes for better query performance
+        // Indexes for Actor table
         modelBuilder.Entity<Actor>()
             .HasIndex(a => a.TmdbId)
-            .IsUnique();
-
-        modelBuilder.Entity<Movie>()
-            .HasIndex(m => m.TmdbId)
-            .IsUnique();
+            .IsUnique()
+            .HasDatabaseName("IX_Actor_TmdbId");
 
         modelBuilder.Entity<Actor>()
-            .HasIndex(a => a.DateOfDeath);
+            .HasIndex(a => a.Name)
+            .HasDatabaseName("IX_Actor_Name");
+
+        modelBuilder.Entity<Actor>()
+            .HasIndex(a => a.DateOfDeath)
+            .HasDatabaseName("IX_Actor_DateOfDeath");
+
+        // Indexes for Movie table
+        modelBuilder.Entity<Movie>()
+            .HasIndex(m => m.TmdbId)
+            .IsUnique()
+            .HasDatabaseName("IX_Movie_TmdbId");
+
+        modelBuilder.Entity<Movie>()
+            .HasIndex(m => m.Title)
+            .HasDatabaseName("IX_Movie_Title");
+
+        modelBuilder.Entity<Movie>()
+            .HasIndex(m => m.ReleaseDate)
+            .HasDatabaseName("IX_Movie_ReleaseDate");
+
+        // Indexes for MovieCredit table
+        modelBuilder.Entity<MovieCredit>()
+            .HasIndex(mc => new { mc.ActorId, mc.MovieId })
+            .HasDatabaseName("IX_MovieCredit_ActorId_MovieId");
+
+        // Index for DeathRecord table
+        modelBuilder.Entity<DeathRecord>()
+            .HasIndex(d => d.DateOfDeath)
+            .HasDatabaseName("IX_DeathRecord_DateOfDeath");
     }
 }
