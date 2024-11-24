@@ -1,5 +1,5 @@
-using System;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace DeathflixAPI.Models;
 
@@ -11,7 +11,8 @@ public class DeathRecord
     public int ActorId { get; set; }
 
     [Required]
-    public DateTime DateOfDeath { get; set; }
+    [DataType(DataType.Date)]
+    public DateOnly DateOfDeath { get; set; }
 
     [StringLength(200)]
     public string? CauseOfDeath { get; set; }
@@ -22,6 +23,7 @@ public class DeathRecord
     [StringLength(1000)]
     public string? AdditionalDetails { get; set; }
 
+    [DataType(DataType.DateTime)]
     public DateTime LastVerified { get; set; }
 
     [StringLength(500)]

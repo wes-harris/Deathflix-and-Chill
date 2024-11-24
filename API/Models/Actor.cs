@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -19,11 +17,11 @@ public class Actor
     [StringLength(500)]
     public string? Biography { get; set; }
 
-    [Column(TypeName = "timestamptz")]
-    public DateTime? DateOfBirth { get; set; }
+    [DataType(DataType.Date)]
+    public DateOnly? DateOfBirth { get; set; }
 
-    [Column(TypeName = "timestamptz")]
-    public DateTime? DateOfDeath { get; set; }
+    [DataType(DataType.Date)]
+    public DateOnly? DateOfDeath { get; set; }
 
     [StringLength(200)]
     public string? PlaceOfBirth { get; set; }

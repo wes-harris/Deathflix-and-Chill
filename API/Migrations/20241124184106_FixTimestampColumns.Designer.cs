@@ -3,6 +3,7 @@ using System;
 using DeathflixAPI.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DeathflixAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20241124184106_FixTimestampColumns")]
+    partial class FixTimestampColumns
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -35,10 +38,10 @@ namespace DeathflixAPI.Migrations
                         .HasColumnType("character varying(500)");
 
                     b.Property<DateTime?>("DateOfBirth")
-                        .HasColumnType("date");
+                        .HasColumnType("timestamptz");
 
                     b.Property<DateTime?>("DateOfDeath")
-                        .HasColumnType("date");
+                        .HasColumnType("timestamptz");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -57,6 +60,16 @@ namespace DeathflixAPI.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DateOfDeath")
+                        .HasDatabaseName("IX_Actor_DateOfDeath");
+
+                    b.HasIndex("Name")
+                        .HasDatabaseName("IX_Actor_Name");
+
+                    b.HasIndex("TmdbId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Actor_TmdbId");
 
                     b.ToTable("Actors");
                 });
@@ -81,7 +94,7 @@ namespace DeathflixAPI.Migrations
                         .HasColumnType("character varying(200)");
 
                     b.Property<DateTime>("DateOfDeath")
-                        .HasColumnType("date");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("LastVerified")
                         .HasColumnType("timestamp with time zone");
@@ -98,6 +111,9 @@ namespace DeathflixAPI.Migrations
 
                     b.HasIndex("ActorId")
                         .IsUnique();
+
+                    b.HasIndex("DateOfDeath")
+                        .HasDatabaseName("IX_DeathRecord_DateOfDeath");
 
                     b.ToTable("DeathRecords");
                 });
@@ -131,6 +147,16 @@ namespace DeathflixAPI.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ReleaseDate")
+                        .HasDatabaseName("IX_Movie_ReleaseDate");
+
+                    b.HasIndex("Title")
+                        .HasDatabaseName("IX_Movie_Title");
+
+                    b.HasIndex("TmdbId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Movie_TmdbId");
+
                     b.ToTable("Movies");
                 });
 
@@ -162,9 +188,10 @@ namespace DeathflixAPI.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ActorId");
-
                     b.HasIndex("MovieId");
+
+                    b.HasIndex("ActorId", "MovieId")
+                        .HasDatabaseName("IX_MovieCredit_ActorId_MovieId");
 
                     b.ToTable("MovieCredits");
                 });
