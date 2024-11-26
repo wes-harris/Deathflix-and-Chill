@@ -203,17 +203,32 @@ public class ActorsController : ControllerBase
         catch (TmdbApiException ex) when (ex.StatusCode == 429)
         {
             _logger.LogWarning(ex, "TMDB API rate limit exceeded");
-            return StatusCode(503, "Search service is temporarily unavailable. Please try again later.");
+            return StatusCode(429, "Search service is temporarily unavailable. Please try again later.");
         }
         catch (TmdbApiException ex)
         {
             _logger.LogError(ex, "TMDB API error occurred during search");
-            return StatusCode(502, "Error communicating with search service");
+            return StatusCode(400, "Error communicating with search service");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error occurred during actor search");
             return StatusCode(500, "An unexpected error occurred");
+        }
+
+    }
+    [HttpGet("test-tmdb")]
+    public async Task<IActionResult> TestTmdbConnection()
+    {
+        try
+        {
+            await _tmdbService.TestConnectionAsync();
+            return Ok("TMDB connection test completed - check logs for details");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "TMDB connection test failed");
+            return StatusCode(500, "TMDB connection test failed - check logs for details");
         }
     }
 

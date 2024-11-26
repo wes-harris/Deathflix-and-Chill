@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using DeathflixAPI.Data;
 using DeathflixAPI.Services;
+using DeathflixAPI.BackgroundServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,9 +12,12 @@ builder.Services.AddControllers();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Add TMDB service registration here
+// Add TMDB service
 builder.Services.AddHttpClient<ITmdbService, TmdbService>();
 builder.Services.AddScoped<ITmdbService, TmdbService>();
+
+// Add background service
+builder.Services.AddHostedService<TmdbSyncService>();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();

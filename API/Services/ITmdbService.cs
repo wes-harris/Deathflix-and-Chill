@@ -8,4 +8,6 @@ public interface ITmdbService
     Task<TmdbActorDetails?> GetActorDetailsAsync(int tmdbId);
     Task<TmdbMovieCredits?> GetActorMovieCreditsAsync(int tmdbId);
     Task<List<TmdbActorDetails>> GetRecentlyDeceasedActorsAsync();
+    Task TestConnectionAsync();
+    Task<TmdbActorResponse?> GetAllActorsAsync(int page = 1);
 }
