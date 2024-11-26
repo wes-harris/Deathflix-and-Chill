@@ -14,7 +14,7 @@ public class Actor
     [StringLength(200)]
     public string Name { get; set; } = string.Empty;
 
-    [StringLength(500)]
+    [Column(TypeName = "text")]  // Changed to PostgreSQL text type
     public string? Biography { get; set; }
 
     [DataType(DataType.Date)]
