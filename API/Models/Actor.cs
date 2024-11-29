@@ -14,7 +14,7 @@ public class Actor
     [StringLength(200)]
     public string Name { get; set; } = string.Empty;
 
-    [Column(TypeName = "text")]  // Changed to PostgreSQL text type
+    [Column(TypeName = "text")]
     public string? Biography { get; set; }
 
     [DataType(DataType.Date)]
@@ -28,6 +28,9 @@ public class Actor
 
     [StringLength(200)]
     public string? ProfileImagePath { get; set; }
+
+    public DateTime LastDetailsCheck { get; set; }
+    public DateTime LastDeathCheck { get; set; }
 
     public bool IsDeceased => DateOfDeath.HasValue;
 

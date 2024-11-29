@@ -12,11 +12,14 @@ builder.Services.AddControllers();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Add TMDB service
+// Register TMDB services
 builder.Services.AddHttpClient<ITmdbService, TmdbService>();
 builder.Services.AddScoped<ITmdbService, TmdbService>();
+builder.Services.AddHttpClient<TmdbExportService>();
+builder.Services.AddScoped<TmdbExportService>();
+builder.Services.AddScoped<ActorDetailsService>();
 
-// Add background service
+// Register background service
 builder.Services.AddHostedService<TmdbSyncService>();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
