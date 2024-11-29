@@ -20,21 +20,23 @@ public class ActorDetailsService
         _tmdbService = tmdbService;
     }
 
-    public async Task UpdateActorDetailsAsync(Actor actor, CancellationToken cancellationToken = default)
+    public async Task<bool> UpdateActorDetailsAsync(Actor actor, CancellationToken cancellationToken = default)
     {
         try
         {
-            // Skip if actor is deceased and we already have their details
-            if (actor.DateOfDeath.HasValue && !string.IsNullOrEmpty(actor.Biography))
+            // Skip if actor is deceased and we already have their complete details
+            if (actor.DateOfDeath.HasValue &&
+                !string.IsNullOrEmpty(actor.Biography) &&
+                !string.IsNullOrEmpty(actor.ProfileImagePath))
             {
-                return;
+                return false;
             }
 
             // Skip if we checked recently and they're not deceased
             if (!actor.DateOfDeath.HasValue &&
                 DateTime.UtcNow - actor.LastDetailsCheck < _livingActorUpdateInterval)
             {
-                return;
+                return false;
             }
 
             _logger.LogInformation("Updating details for actor: {ActorName} (ID: {TmdbId})",
@@ -43,17 +45,72 @@ public class ActorDetailsService
             var details = await _tmdbService.GetActorDetailsAsync(actor.TmdbId);
             if (details != null)
             {
-                actor.Biography = details.Biography;
-                actor.DateOfBirth = details.Birthday != null ? DateOnly.Parse(details.Birthday) : null;
-                actor.DateOfDeath = details.Deathday != null ? DateOnly.Parse(details.Deathday) : null;
-                actor.PlaceOfBirth = details.PlaceOfBirth;
-                actor.LastDetailsCheck = DateTime.UtcNow;
+                var wasUpdated = false;
 
-                _logger.LogInformation("Successfully updated details for actor: {ActorName}", actor.Name);
+                // Update biography if empty or changed
+                if (string.IsNullOrEmpty(actor.Biography) || actor.Biography != details.Biography)
+                {
+                    actor.Biography = details.Biography;
+                    wasUpdated = true;
+                }
+
+                // Update birth date if available
+                if (details.Birthday != null)
+                {
+                    var newBirthDate = DateOnly.Parse(details.Birthday);
+                    if (actor.DateOfBirth != newBirthDate)
+                    {
+                        actor.DateOfBirth = newBirthDate;
+                        wasUpdated = true;
+                    }
+                }
+
+                // Update death date if available
+                if (details.Deathday != null)
+                {
+                    var newDeathDate = DateOnly.Parse(details.Deathday);
+                    if (actor.DateOfDeath != newDeathDate)
+                    {
+                        actor.DateOfDeath = newDeathDate;
+                        wasUpdated = true;
+                    }
+                }
+
+                // Update place of birth if available
+                if (!string.IsNullOrEmpty(details.PlaceOfBirth) &&
+                    actor.PlaceOfBirth != details.PlaceOfBirth)
+                {
+                    actor.PlaceOfBirth = details.PlaceOfBirth;
+                    wasUpdated = true;
+                }
+
+                // Update profile image if available
+                if (!string.IsNullOrEmpty(details.ProfilePath) &&
+                    actor.ProfileImagePath != details.ProfilePath)
+                {
+                    actor.ProfileImagePath = details.ProfilePath;
+                    wasUpdated = true;
+                }
+
+                // Always update timestamps
+                actor.LastDetailsCheck = DateTime.UtcNow;
+                actor.LastDeathCheck = DateTime.UtcNow;
+
+                if (wasUpdated)
+                {
+                    _logger.LogInformation("Successfully updated details for actor: {ActorName}", actor.Name);
+                }
+                else
+                {
+                    _logger.LogInformation("No new information available for actor: {ActorName}", actor.Name);
+                }
+
+                // Add delay for rate limiting
+                await Task.Delay(_apiRequestDelay, cancellationToken);
+                return wasUpdated;
             }
 
-            // Add delay for rate limiting
-            await Task.Delay(_apiRequestDelay, cancellationToken);
+            return false;
         }
         catch (Exception ex)
         {
@@ -63,7 +120,7 @@ public class ActorDetailsService
         }
     }
 
-    public async Task UpdateActorsBatchAsync(
+    public async Task<(int ProcessedCount, int UpdatedCount)> UpdateActorsBatchAsync(
         AppDbContext dbContext,
         int batchSize = 100,
         CancellationToken cancellationToken = default)
@@ -71,15 +128,16 @@ public class ActorDetailsService
         try
         {
             var now = DateTime.UtcNow;
+            int processedCount = 0;
+            int updatedCount = 0;
 
-            // Get actors that need updating
             var actorsToUpdate = await dbContext.Actors
                 .Where(a =>
                     // Living actors that haven't been checked recently
                     (!a.DateOfDeath.HasValue && a.LastDetailsCheck < now - _livingActorUpdateInterval) ||
                     // New actors that haven't been checked at all
                     a.LastDetailsCheck == DateTime.MinValue)
-                .OrderBy(a => a.LastDetailsCheck)
+                .OrderByDescending(a => a.Popularity)  // Process most popular actors first
                 .Take(batchSize)
                 .ToListAsync(cancellationToken);
 
@@ -91,8 +149,13 @@ public class ActorDetailsService
 
                 try
                 {
-                    await UpdateActorDetailsAsync(actor, cancellationToken);
-                    await dbContext.SaveChangesAsync(cancellationToken);
+                    processedCount++;
+                    bool wasUpdated = await UpdateActorDetailsAsync(actor, cancellationToken);
+                    if (wasUpdated)
+                    {
+                        updatedCount++;
+                        await dbContext.SaveChangesAsync(cancellationToken);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -102,7 +165,11 @@ public class ActorDetailsService
                 }
             }
 
-            _logger.LogInformation("Completed batch update for {Count} actors", actorsToUpdate.Count);
+            _logger.LogInformation(
+                "Completed batch update. Processed: {Processed}, Updated: {Updated}",
+                processedCount, updatedCount);
+
+            return (processedCount, updatedCount);
         }
         catch (Exception ex)
         {
