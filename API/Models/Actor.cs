@@ -29,6 +29,9 @@ public class Actor
     [StringLength(200)]
     public string? ProfileImagePath { get; set; }
 
+    [Column(TypeName = "decimal(10,3)")]
+    public double Popularity { get; set; }
+
     public DateTime LastDetailsCheck { get; set; }
     public DateTime LastDeathCheck { get; set; }
 

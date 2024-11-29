@@ -14,6 +14,7 @@ public class TmdbExportService
     private readonly string _downloadPath;
     private readonly string _apiKey;
     private const string BaseUrl = "http://files.tmdb.org/p/exports/";
+    private const double PopularityThreshold = 5.0;
 
     public TmdbExportService(
         HttpClient httpClient,
@@ -26,7 +27,6 @@ public class TmdbExportService
         _apiKey = configuration["Tmdb:ApiKey"] ??
             throw new ArgumentException("TMDB API key not found in configuration");
 
-        // Create download directory if it doesn't exist
         if (!Directory.Exists(_downloadPath))
         {
             Directory.CreateDirectory(_downloadPath);
@@ -37,7 +37,6 @@ public class TmdbExportService
     {
         try
         {
-            // Try multiple file patterns
             var potentialFiles = new[]
             {
                 $"person_ids_{DateTime.UtcNow:MM_dd_yyyy}.json.gz",
@@ -74,7 +73,6 @@ public class TmdbExportService
     {
         try
         {
-            // Log current state of database
             await using var initialScope = serviceProvider.CreateAsyncScope();
             var dbContext = initialScope.ServiceProvider.GetRequiredService<AppDbContext>();
             var actorDetailsService = serviceProvider.GetRequiredService<ActorDetailsService>();
@@ -82,10 +80,7 @@ public class TmdbExportService
             var currentActorCount = await dbContext.Actors.CountAsync(cancellationToken);
             _logger.LogInformation("Current actor count in database: {Count}", currentActorCount);
 
-            // Process the daily export file
             await ProcessBasicActorDataAsync(serviceProvider, cancellationToken);
-
-            // Update details for a batch of actors
             await actorDetailsService.UpdateActorsBatchAsync(dbContext, 100, cancellationToken);
 
             _logger.LogInformation("Completed daily actor sync and detail updates");
@@ -115,7 +110,6 @@ public class TmdbExportService
             return;
         }
 
-        // Process the file
         await using var scope = serviceProvider.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
@@ -125,6 +119,7 @@ public class TmdbExportService
 
         string? line;
         int processedCount = 0;
+        int skippedCount = 0;
         int newActorsCount = 0;
         int updatedActorsCount = 0;
         var batchSize = 100;
@@ -136,56 +131,78 @@ public class TmdbExportService
             var person = JsonSerializer.Deserialize<TmdbDailyExportPerson>(line);
             if (person == null) continue;
 
+            // Skip actors below the popularity threshold
+            if (person.Popularity < PopularityThreshold)
+            {
+                skippedCount++;
+                if (skippedCount % 10000 == 0)
+                {
+                    _logger.LogInformation("Skipped {Count} low-popularity actors", skippedCount);
+                }
+                continue;
+            }
+
             var actor = await dbContext.Actors
                 .FirstOrDefaultAsync(a => a.TmdbId == person.Id, cancellationToken);
 
             if (actor == null)
             {
-                // New actor - create with basic info
                 actor = new Actor
                 {
                     TmdbId = person.Id,
                     Name = person.Name,
+                    Popularity = person.Popularity,
                     LastDetailsCheck = DateTime.MinValue,
                     LastDeathCheck = DateTime.MinValue
                 };
                 dbContext.Actors.Add(actor);
                 newActorsCount++;
-                _logger.LogInformation("Adding new actor: {ActorName} (TMDB ID: {TmdbId})",
-                    person.Name, person.Id);
+                _logger.LogInformation("Adding new actor: {ActorName} (TMDB ID: {TmdbId}, Popularity: {Popularity})",
+                    person.Name, person.Id, person.Popularity);
             }
-            else if (actor.Name != person.Name)
+            else if (actor.Name != person.Name || Math.Abs(actor.Popularity - person.Popularity) > 0.001)
             {
-                // Update name if changed
                 actor.Name = person.Name;
+                actor.Popularity = person.Popularity;
                 dbContext.Actors.Update(actor);
                 updatedActorsCount++;
-                _logger.LogInformation("Updating actor name: {OldName} -> {NewName} (TMDB ID: {TmdbId})",
-                    actor.Name, person.Name, person.Id);
+                _logger.LogInformation("Updating actor: {ActorName} (TMDB ID: {TmdbId}, Popularity: {Popularity})",
+                    person.Name, person.Id, person.Popularity);
             }
 
             processedCount++;
             if (processedCount % batchSize == 0)
             {
                 _logger.LogInformation(
-                    "Processed {Count} actors (New: {NewCount}, Updated: {UpdatedCount})",
-                    processedCount, newActorsCount, updatedActorsCount);
+                    "Processed {Count} actors (New: {NewCount}, Updated: {UpdatedCount}, Skipped: {SkippedCount})",
+                    processedCount, newActorsCount, updatedActorsCount, skippedCount);
                 await dbContext.SaveChangesAsync(cancellationToken);
             }
         }
 
-        // Save any remaining changes
         if (processedCount % batchSize != 0)
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
+        // Clean up low-popularity actors that are no longer relevant
+        var lowPopularityActors = await dbContext.Actors
+            .Where(a => a.Popularity < PopularityThreshold)
+            .ToListAsync(cancellationToken);
+
+        if (lowPopularityActors.Any())
+        {
+            _logger.LogInformation("Removing {Count} actors that fell below popularity threshold",
+                lowPopularityActors.Count);
+            dbContext.Actors.RemoveRange(lowPopularityActors);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
         var finalActorCount = await dbContext.Actors.CountAsync(cancellationToken);
         _logger.LogInformation(
-            "Completed processing daily export. Total processed: {Count}, New: {NewCount}, Updated: {UpdatedCount}, Final DB Count: {FinalCount}",
-            processedCount, newActorsCount, updatedActorsCount, finalActorCount);
+            "Completed processing daily export. Total processed: {Count}, New: {NewCount}, Updated: {UpdatedCount}, Skipped: {SkippedCount}, Final DB Count: {FinalCount}",
+            processedCount, newActorsCount, updatedActorsCount, skippedCount, finalActorCount);
 
-        // Clean up the downloaded file
         try
         {
             File.Delete(filePath);
@@ -198,7 +215,7 @@ public class TmdbExportService
 
     private string GetExportUrl(string fileName)
     {
-        return $"{BaseUrl}{fileName}?api_key={_apiKey}";
+        return $"https://files.tmdb.org/p/exports/{fileName}";
     }
 
     private async Task<string?> DownloadExportFileAsync(string fileName)
@@ -210,7 +227,10 @@ public class TmdbExportService
 
             _logger.LogInformation("Downloading export file from: {Url}", url);
 
-            var response = await _httpClient.GetAsync(url);
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
+
+            var response = await _httpClient.SendAsync(request);
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogError("Failed to download export file. Status: {StatusCode}", response.StatusCode);
@@ -244,7 +264,6 @@ public class TmdbExportService
                 _logger.LogInformation("Export service content: {Content}", content);
             }
 
-            // Test specific file access
             var testUrl = GetExportUrl("person_ids_daily.json.gz");
             _logger.LogInformation("Testing specific file access: {Url}", testUrl);
 
