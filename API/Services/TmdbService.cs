@@ -11,6 +11,7 @@ public class TmdbService : ITmdbService
     private readonly HttpClient _httpClient;
     private readonly string _apiKey;
     private readonly ILogger<TmdbService> _logger;
+    private const string ImageBaseUrl = "https://image.tmdb.org/t/p/original";
 
     public TmdbService(
         HttpClient httpClient,
@@ -52,6 +53,14 @@ public class TmdbService : ITmdbService
 
             var result = await response.Content.ReadFromJsonAsync<TmdbActorResponse>();
 
+            if (result?.Results != null)
+            {
+                foreach (var actor in result.Results.Where(a => !string.IsNullOrEmpty(a.ProfilePath)))
+                {
+                    actor.ProfilePath = GetFullImageUrl(actor.ProfilePath!);
+                }
+            }
+
             _logger.LogInformation("Found {Count} actors matching query: {Query}",
                 result?.Results.Count ?? 0, query);
 
@@ -83,6 +92,12 @@ public class TmdbService : ITmdbService
             await EnsureSuccessStatusCodeAsync(response);
 
             var result = await response.Content.ReadFromJsonAsync<TmdbActorDetails>();
+
+            if (result != null && !string.IsNullOrEmpty(result.ProfilePath))
+            {
+                result.ProfilePath = GetFullImageUrl(result.ProfilePath);
+                _logger.LogDebug("Profile image URL set to: {Url}", result.ProfilePath);
+            }
 
             _logger.LogInformation("Successfully retrieved details for actor: {ActorName}",
                 result?.Name ?? "Unknown");
@@ -167,6 +182,14 @@ public class TmdbService : ITmdbService
 
             var result = await response.Content.ReadFromJsonAsync<TmdbActorResponse>();
 
+            if (result?.Results != null)
+            {
+                foreach (var actor in result.Results.Where(a => !string.IsNullOrEmpty(a.ProfilePath)))
+                {
+                    actor.ProfilePath = GetFullImageUrl(actor.ProfilePath!);
+                }
+            }
+
             _logger.LogInformation("Found {Count} actors on page {Page}",
                 result?.Results.Count ?? 0, page);
 
@@ -197,5 +220,16 @@ public class TmdbService : ITmdbService
                 $"TMDB API returned error {(int)response.StatusCode}: {content}",
                 (int)response.StatusCode);
         }
+    }
+
+    private string GetFullImageUrl(string profilePath)
+    {
+        if (string.IsNullOrEmpty(profilePath))
+            return string.Empty;
+
+        if (!profilePath.StartsWith("/"))
+            profilePath = "/" + profilePath;
+
+        return ImageBaseUrl + profilePath;
     }
 }

@@ -28,6 +28,18 @@ public class TmdbActorDetails
     [JsonPropertyName("popularity")]
     public double Popularity { get; set; }
 
+    [JsonPropertyName("known_for_department")]
+    public string? KnownForDepartment { get; set; }
+
     [JsonPropertyName("gender")]
     public int Gender { get; set; }
+
+    [JsonPropertyName("adult")]
+    public bool Adult { get; set; }
+
+    [JsonPropertyName("imdb_id")]
+    public string? ImdbId { get; set; }
+
+    [JsonPropertyName("homepage")]
+    public string? Homepage { get; set; }
 }
