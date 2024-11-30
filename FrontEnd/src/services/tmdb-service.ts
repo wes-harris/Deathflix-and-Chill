@@ -1,3 +1,5 @@
+import { RateLimiter } from './rate-limiter';
+
 interface TmdbActorResponse {
     id: number;
     name: string;
@@ -40,8 +42,17 @@ interface TmdbMovieCredits {
 export class TmdbService {
     private readonly baseUrl = 'https://api.themoviedb.org/3';
     private readonly imageBaseUrl = 'https://image.tmdb.org/t/p/original';
+    private readonly rateLimiter: RateLimiter;
 
-    constructor(private apiKey: string) {}
+    constructor(private apiKey: string) {
+        // TMDB allows 40 requests per 10 seconds
+        this.rateLimiter = new RateLimiter(40, 4);
+    }
+
+    private async fetchWithRateLimit(url: string): Promise<Response> {
+        await this.rateLimiter.acquireToken();
+        return fetch(url);
+    }
 
     async getActorDetails(id: number): Promise<TmdbActorResponse> {
         if (id <= 0) {
@@ -49,7 +60,7 @@ export class TmdbService {
         }
 
         try {
-            const response = await fetch(
+            const response = await this.fetchWithRateLimit(
                 `${this.baseUrl}/person/${id}?api_key=${this.apiKey}&language=en-US`
             );
 
@@ -81,7 +92,7 @@ export class TmdbService {
         }
 
         try {
-            const response = await fetch(
+            const response = await this.fetchWithRateLimit(
                 `${this.baseUrl}/search/person?api_key=${this.apiKey}&query=${encodeURIComponent(query)}&include_adult=false&language=en-US`
             );
 
@@ -116,7 +127,7 @@ export class TmdbService {
         }
 
         try {
-            const response = await fetch(
+            const response = await this.fetchWithRateLimit(
                 `${this.baseUrl}/person/${id}/movie_credits?api_key=${this.apiKey}&language=en-US`
             );
 

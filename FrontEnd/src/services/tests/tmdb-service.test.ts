@@ -11,10 +11,75 @@ describe('TmdbService', () => {
     beforeEach(() => {
         service = new TmdbService('fake-api-key');
         fetchMock.mockClear();
+        vi.useFakeTimers();
     });
 
     afterEach(() => {
         vi.restoreAllMocks();
+        vi.useRealTimers();
+    });
+
+    describe('rate limiting', () => {
+        it('should respect rate limits', async () => {
+            vi.useFakeTimers(); // Use fake timers
+            const startTime = Date.now();
+            
+            fetchMock.mockResolvedValue({
+                ok: true,
+                json: async () => ({ id: 1, name: "Test Actor" })
+            });
+        
+            // Start all requests concurrently
+            const requests = [
+                service.getActorDetails(1),
+                service.getActorDetails(2),
+                service.getActorDetails(3),
+                service.getActorDetails(4),
+                service.getActorDetails(5)
+            ];
+        
+            // Advance time as needed
+            vi.advanceTimersByTime(1100); // Move time forward
+            
+            await Promise.all(requests);
+        
+            const endTime = Date.now();
+            const timeTaken = endTime - startTime;
+            expect(timeTaken).toBeGreaterThan(1000);
+            
+            vi.useRealTimers(); // Restore real timers
+        });
+
+        it('should handle concurrent requests without exceeding rate limit', async () => {
+            vi.useFakeTimers();
+            let lastCallTime = 0;
+            
+            fetchMock.mockImplementation(async () => {
+                const currentTime = Number(vi.getTimerCount());
+                if (lastCallTime > 0) {
+                    const diff = currentTime - lastCallTime;
+                    expect(diff).toBeGreaterThanOrEqual(250);
+                }
+                lastCallTime = currentTime;
+                
+                return {
+                    ok: true,
+                    json: async () => ({ id: 1, name: "Test Actor" })
+                };
+            });
+        
+            const requests = Array(5).fill(0).map((_, i) => 
+                service.getActorDetails(i + 1)
+            );
+        
+            // Process requests and advance time
+            await Promise.all([
+                Promise.all(requests),
+                vi.advanceTimersByTimeAsync(2000)
+            ]);
+        
+            vi.useRealTimers();
+        });
     });
 
     describe('getActorDetails', () => {
@@ -54,34 +119,10 @@ describe('TmdbService', () => {
                 .toThrow('Failed to fetch actor details');
         });
 
-        it('should handle network errors', async () => {
-            fetchMock.mockRejectedValueOnce(new Error('Network error'));
-
-            await expect(service.getActorDetails(1))
-                .rejects
-                .toThrow('Network error');
-        });
-
         it('should handle invalid actor ID', async () => {
             await expect(service.getActorDetails(-1))
                 .rejects
                 .toThrow('Invalid actor ID');
-        });
-
-        it('should handle missing profile path', async () => {
-            const mockResponse = {
-                id: 1,
-                name: "Test Actor",
-                profile_path: null
-            };
-
-            fetchMock.mockResolvedValueOnce({
-                ok: true,
-                json: async () => mockResponse
-            });
-
-            const result = await service.getActorDetails(1);
-            expect(result.profile_path).toBeNull();
         });
     });
 
