@@ -354,8 +354,6 @@ public class ActorsController : ControllerBase
                     DateOfDeath = a.DateOfDeath,
                     DeathRecord = a.DeathRecord == null ? null : new
                     {
-                        CauseOfDeath = a.DeathRecord.CauseOfDeath,
-                        PlaceOfDeath = a.DeathRecord.PlaceOfDeath,
                         AdditionalDetails = a.DeathRecord.AdditionalDetails,
                         SourceUrl = a.DeathRecord.SourceUrl,
                         LastVerified = a.DeathRecord.LastVerified
@@ -461,11 +459,9 @@ public class ActorsController : ControllerBase
 
     [HttpGet("filter-deaths")]
     public async Task<ActionResult<PagedResponse<dynamic>>> FilterDeaths(
-    [FromQuery] ActorParameters parameters,  // Required parameter first
-    [FromQuery] DateTime? fromDate = null,   // Optional parameters after
-    [FromQuery] DateTime? toDate = null,
-    [FromQuery] string? causeOfDeath = null,
-    [FromQuery] string? placeOfDeath = null)
+    [FromQuery] ActorParameters parameters,
+    [FromQuery] DateTime? fromDate = null,
+    [FromQuery] DateTime? toDate = null)
     {
         try
         {
@@ -476,7 +472,7 @@ public class ActorsController : ControllerBase
                 .Where(a => a.DateOfDeath.HasValue)
                 .AsQueryable();
 
-            // Apply filters
+            // Apply date filters if provided
             if (fromDate.HasValue)
             {
                 var fromDateOnly = DateOnly.FromDateTime(fromDate.Value);
@@ -524,14 +520,7 @@ public class ActorsController : ControllerBase
                     a.ProfileImagePath,
                     DateOfBirth = a.DateOfBirth,
                     DateOfDeath = a.DateOfDeath,
-                    DeathRecord = a.DeathRecord == null ? null : new
-                    {
-                        a.DeathRecord.CauseOfDeath,
-                        a.DeathRecord.PlaceOfDeath,
-                        a.DeathRecord.AdditionalDetails,
-                        a.DeathRecord.SourceUrl,
-                        a.DeathRecord.LastVerified
-                    }
+                    a.DeathRecord
                 })
                 .ToListAsync();
 
@@ -552,7 +541,6 @@ public class ActorsController : ControllerBase
             return StatusCode(500, "An error occurred while filtering actors");
         }
     }
-
 
     [HttpGet("test-tmdb")]
     public async Task<IActionResult> TestTmdbConnection()
