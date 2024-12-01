@@ -369,6 +369,82 @@ public class ActorsController : ControllerBase
         }
 
     }
+
+    // GET: api/actors/filter-deaths
+    [HttpGet("filter-deaths")]
+    public async Task<ActionResult<IEnumerable<dynamic>>> FilterDeaths(
+        [FromQuery] DateTime? fromDate = null,
+        [FromQuery] DateTime? toDate = null,
+        [FromQuery] string? causeOfDeath = null,
+        [FromQuery] string? placeOfDeath = null,
+        [FromQuery] int limit = 50)
+    {
+        try
+        {
+            _logger.LogInformation("Filtering actors by death criteria");
+
+            var query = _context.Actors
+                .Include(a => a.DeathRecord)
+                .Where(a => a.DateOfDeath.HasValue)
+                .AsQueryable();
+
+            // Apply date filters if provided
+            if (fromDate.HasValue)
+            {
+                var fromDateOnly = DateOnly.FromDateTime(fromDate.Value);
+                query = query.Where(a => a.DateOfDeath >= fromDateOnly);
+            }
+
+            if (toDate.HasValue)
+            {
+                var toDateOnly = DateOnly.FromDateTime(toDate.Value);
+                query = query.Where(a => a.DateOfDeath <= toDateOnly);
+            }
+
+            // Apply place of death filter
+            if (!string.IsNullOrWhiteSpace(placeOfDeath))
+            {
+                query = query.Where(a => a.DeathRecord != null &&
+                                        a.DeathRecord.PlaceOfDeath != null &&
+                                        a.DeathRecord.PlaceOfDeath.Contains(placeOfDeath));
+            }
+
+            var results = await query
+                .OrderByDescending(a => a.DateOfDeath)
+                .Take(limit)
+                .Select(a => new
+                {
+                    a.Id,
+                    a.TmdbId,
+                    a.Name,
+                    a.ProfileImagePath,
+                    DateOfBirth = a.DateOfBirth,
+                    DateOfDeath = a.DateOfDeath,
+                    DeathRecord = a.DeathRecord == null ? null : new
+                    {
+                        a.DeathRecord.CauseOfDeath,
+                        a.DeathRecord.PlaceOfDeath,
+                        a.DeathRecord.AdditionalDetails,
+                        a.DeathRecord.SourceUrl,
+                        a.DeathRecord.LastVerified
+                    }
+                })
+                .ToListAsync();
+
+            if (!results.Any())
+            {
+                return NotFound("No actors found matching the specified criteria");
+            }
+
+            return Ok(results);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error filtering actors by death criteria");
+            return StatusCode(500, "An error occurred while filtering actors");
+        }
+    }
+
     [HttpGet("test-tmdb")]
     public async Task<IActionResult> TestTmdbConnection()
     {
