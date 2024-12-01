@@ -28,28 +28,49 @@ public class ActorsController : ControllerBase
 
     // GET: api/actors
     [HttpGet]
-    public async Task<ActionResult<PagedResponse<Actor>>> GetActors([FromQuery] PaginationParameters parameters)
+    public async Task<ActionResult<PagedResponse<Actor>>> GetActors([FromQuery] ActorParameters parameters)
     {
         try
         {
-            _logger.LogInformation("Retrieving actors with pagination. Page: {PageNumber}, Size: {PageSize}",
-                parameters.PageNumber, parameters.PageSize);
+            _logger.LogInformation("Retrieving actors with pagination and sorting");
 
             var query = _context.Actors.AsQueryable();
 
+            // Apply sorting
+            query = parameters.Sorting.SortBy.ToLower() switch
+            {
+                "name" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.Name)
+                    : query.OrderByDescending(a => a.Name),
+
+                "birthdate" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.DateOfBirth)
+                    : query.OrderByDescending(a => a.DateOfBirth),
+
+                "deathdate" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.DateOfDeath)
+                    : query.OrderByDescending(a => a.DateOfDeath),
+
+                "popularity" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.Popularity)
+                    : query.OrderByDescending(a => a.Popularity),
+
+                _ => query.OrderBy(a => a.Name) // default sorting
+            };
+
             var totalRecords = await query.CountAsync();
             var actors = await query
-                .Skip((parameters.PageNumber - 1) * parameters.PageSize)
-                .Take(parameters.PageSize)
+                .Skip((parameters.Pagination.PageNumber - 1) * parameters.Pagination.PageSize)
+                .Take(parameters.Pagination.PageSize)
                 .ToListAsync();
 
             var pagedResponse = new PagedResponse<Actor>
             {
                 Data = actors,
-                PageNumber = parameters.PageNumber,
-                PageSize = parameters.PageSize,
+                PageNumber = parameters.Pagination.PageNumber,
+                PageSize = parameters.Pagination.PageSize,
                 TotalRecords = totalRecords,
-                TotalPages = (int)Math.Ceiling(totalRecords / (double)parameters.PageSize)
+                TotalPages = (int)Math.Ceiling(totalRecords / (double)parameters.Pagination.PageSize)
             };
 
             return Ok(pagedResponse);
@@ -60,7 +81,6 @@ public class ActorsController : ControllerBase
             return StatusCode(500, "An error occurred while retrieving actors");
         }
     }
-
     // GET: api/actors/5
     [HttpGet("{id}")]
     public async Task<ActionResult<Actor>> GetActor(int id)
@@ -271,13 +291,12 @@ public class ActorsController : ControllerBase
 
     [HttpGet("deceased")]
     public async Task<ActionResult<PagedResponse<dynamic>>> GetRecentlyDeceasedActors(
-        [FromQuery] DateTime? since = null,
-        [FromQuery] DateTime? until = null,
-        [FromQuery] PaginationParameters parameters = null)
+    [FromQuery] ActorParameters parameters,
+    [FromQuery] DateTime? since = null,
+    [FromQuery] DateTime? until = null)
     {
         try
         {
-            parameters ??= new PaginationParameters();
             _logger.LogInformation("Retrieving recently deceased actors");
 
             var query = _context.Actors
@@ -285,6 +304,7 @@ public class ActorsController : ControllerBase
                 .Where(a => a.DateOfDeath.HasValue)
                 .AsQueryable();
 
+            // Apply date filters
             if (since.HasValue)
             {
                 var sinceDate = DateOnly.FromDateTime(since.Value);
@@ -297,12 +317,33 @@ public class ActorsController : ControllerBase
                 query = query.Where(a => a.DateOfDeath.HasValue && a.DateOfDeath.Value <= untilDate);
             }
 
+            // Apply sorting
+            query = parameters.Sorting.SortBy.ToLower() switch
+            {
+                "name" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.Name)
+                    : query.OrderByDescending(a => a.Name),
+
+                "birthdate" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.DateOfBirth)
+                    : query.OrderByDescending(a => a.DateOfBirth),
+
+                "deathdate" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.DateOfDeath)
+                    : query.OrderByDescending(a => a.DateOfDeath),
+
+                "popularity" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.Popularity)
+                    : query.OrderByDescending(a => a.Popularity),
+
+                _ => query.OrderByDescending(a => a.DateOfDeath) // default sorting for deceased
+            };
+
             var totalRecords = await query.CountAsync();
 
             var deceasedActors = await query
-                .OrderByDescending(a => a.DateOfDeath)
-                .Skip((parameters.PageNumber - 1) * parameters.PageSize)
-                .Take(parameters.PageSize)
+                .Skip((parameters.Pagination.PageNumber - 1) * parameters.Pagination.PageSize)
+                .Take(parameters.Pagination.PageSize)
                 .Select(a => new
                 {
                     a.Id,
@@ -325,16 +366,11 @@ public class ActorsController : ControllerBase
             var pagedResponse = new PagedResponse<dynamic>
             {
                 Data = deceasedActors,
-                PageNumber = parameters.PageNumber,
-                PageSize = parameters.PageSize,
+                PageNumber = parameters.Pagination.PageNumber,
+                PageSize = parameters.Pagination.PageSize,
                 TotalRecords = totalRecords,
-                TotalPages = (int)Math.Ceiling(totalRecords / (double)parameters.PageSize)
+                TotalPages = (int)Math.Ceiling(totalRecords / (double)parameters.Pagination.PageSize)
             };
-
-            if (!deceasedActors.Any())
-            {
-                return NotFound("No deceased actors found in the specified time range");
-            }
 
             return Ok(pagedResponse);
         }
@@ -348,21 +384,19 @@ public class ActorsController : ControllerBase
     // Search endpoint already has pagination through TMDB API, but let's make it consistent
     [HttpGet("search")]
     public async Task<ActionResult<PagedResponse<dynamic>>> SearchActors(
-        [FromQuery] string query,
-        [FromQuery] PaginationParameters parameters = null,
-        [FromQuery] double? minPopularity = 5.0)
+    [FromQuery] string query,
+    [FromQuery] ActorParameters parameters,
+    [FromQuery] double? minPopularity = 5.0)
     {
         try
         {
-            parameters ??= new PaginationParameters();
-
             if (string.IsNullOrWhiteSpace(query))
             {
                 return BadRequest("Search query is required");
             }
 
             _logger.LogInformation("Searching for actors with query: {Query}, page: {Page}",
-                query, parameters.PageNumber);
+                query, parameters.Pagination.PageNumber);
 
             var searchResult = await _tmdbService.SearchActorsAsync(query);
             if (searchResult?.Results == null || !searchResult.Results.Any())
@@ -370,13 +404,29 @@ public class ActorsController : ControllerBase
                 return NotFound("No actors found matching the search criteria");
             }
 
+            // Filter by popularity if specified
             var filteredResults = minPopularity.HasValue
                 ? searchResult.Results.Where(r => r.Popularity >= minPopularity.Value)
                 : searchResult.Results;
 
-            var results = filteredResults
-                .Skip((parameters.PageNumber - 1) * parameters.PageSize)
-                .Take(parameters.PageSize)
+            // Apply sorting
+            var sortedResults = parameters.Sorting.SortBy.ToLower() switch
+            {
+                "name" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? filteredResults.OrderBy(r => r.Name)
+                    : filteredResults.OrderByDescending(r => r.Name),
+
+                "popularity" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? filteredResults.OrderBy(r => r.Popularity)
+                    : filteredResults.OrderByDescending(r => r.Popularity),
+
+                _ => filteredResults.OrderByDescending(r => r.Popularity) // default sorting
+            };
+
+            // Apply pagination
+            var pagedResults = sortedResults
+                .Skip((parameters.Pagination.PageNumber - 1) * parameters.Pagination.PageSize)
+                .Take(parameters.Pagination.PageSize)
                 .Select(r => new
                 {
                     r.Id,
@@ -388,9 +438,9 @@ public class ActorsController : ControllerBase
 
             var pagedResponse = new PagedResponse<dynamic>
             {
-                Data = results,
-                PageNumber = parameters.PageNumber,
-                PageSize = parameters.PageSize,
+                Data = pagedResults,
+                PageNumber = parameters.Pagination.PageNumber,
+                PageSize = parameters.Pagination.PageSize,
                 TotalRecords = searchResult.TotalResults,
                 TotalPages = searchResult.TotalPages
             };
@@ -411,15 +461,14 @@ public class ActorsController : ControllerBase
 
     [HttpGet("filter-deaths")]
     public async Task<ActionResult<PagedResponse<dynamic>>> FilterDeaths(
-        [FromQuery] DateTime? fromDate = null,
-        [FromQuery] DateTime? toDate = null,
-        [FromQuery] string? causeOfDeath = null,
-        [FromQuery] string? placeOfDeath = null,
-        [FromQuery] PaginationParameters parameters = null)
+    [FromQuery] ActorParameters parameters,  // Required parameter first
+    [FromQuery] DateTime? fromDate = null,   // Optional parameters after
+    [FromQuery] DateTime? toDate = null,
+    [FromQuery] string? causeOfDeath = null,
+    [FromQuery] string? placeOfDeath = null)
     {
         try
         {
-            parameters ??= new PaginationParameters();
             _logger.LogInformation("Filtering actors by death criteria");
 
             var query = _context.Actors
@@ -427,6 +476,7 @@ public class ActorsController : ControllerBase
                 .Where(a => a.DateOfDeath.HasValue)
                 .AsQueryable();
 
+            // Apply filters
             if (fromDate.HasValue)
             {
                 var fromDateOnly = DateOnly.FromDateTime(fromDate.Value);
@@ -439,19 +489,33 @@ public class ActorsController : ControllerBase
                 query = query.Where(a => a.DateOfDeath <= toDateOnly);
             }
 
-            if (!string.IsNullOrWhiteSpace(placeOfDeath))
+            // Apply sorting
+            query = parameters.Sorting.SortBy.ToLower() switch
             {
-                query = query.Where(a => a.DeathRecord != null &&
-                                       a.DeathRecord.PlaceOfDeath != null &&
-                                       a.DeathRecord.PlaceOfDeath.Contains(placeOfDeath));
-            }
+                "name" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.Name)
+                    : query.OrderByDescending(a => a.Name),
+
+                "birthdate" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.DateOfBirth)
+                    : query.OrderByDescending(a => a.DateOfBirth),
+
+                "deathdate" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.DateOfDeath)
+                    : query.OrderByDescending(a => a.DateOfDeath),
+
+                "popularity" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.Popularity)
+                    : query.OrderByDescending(a => a.Popularity),
+
+                _ => query.OrderByDescending(a => a.DateOfDeath) // default sorting
+            };
 
             var totalRecords = await query.CountAsync();
 
             var results = await query
-                .OrderByDescending(a => a.DateOfDeath)
-                .Skip((parameters.PageNumber - 1) * parameters.PageSize)
-                .Take(parameters.PageSize)
+                .Skip((parameters.Pagination.PageNumber - 1) * parameters.Pagination.PageSize)
+                .Take(parameters.Pagination.PageSize)
                 .Select(a => new
                 {
                     a.Id,
@@ -474,16 +538,11 @@ public class ActorsController : ControllerBase
             var pagedResponse = new PagedResponse<dynamic>
             {
                 Data = results,
-                PageNumber = parameters.PageNumber,
-                PageSize = parameters.PageSize,
+                PageNumber = parameters.Pagination.PageNumber,
+                PageSize = parameters.Pagination.PageSize,
                 TotalRecords = totalRecords,
-                TotalPages = (int)Math.Ceiling(totalRecords / (double)parameters.PageSize)
+                TotalPages = (int)Math.Ceiling(totalRecords / (double)parameters.Pagination.PageSize)
             };
-
-            if (!results.Any())
-            {
-                return NotFound("No actors found matching the specified criteria");
-            }
 
             return Ok(pagedResponse);
         }

@@ -12,3 +12,15 @@ public class PaginationParameters
         set => pageSize = value > maxPageSize ? maxPageSize : value;
     }
 }
+
+public class SortingParameters
+{
+    public string SortBy { get; set; } = "Name";  // default sort field
+    public SortDirection Direction { get; set; } = SortDirection.Ascending;
+}
+
+public class ActorParameters
+{
+    public PaginationParameters Pagination { get; set; } = new();
+    public SortingParameters Sorting { get; set; } = new();
+}
