@@ -8,11 +8,11 @@ using DeathflixAPI.Exceptions;
 
 namespace DeathflixAPI.Controllers;
 
-[ApiController]
-[Route("api/[controller]")]
 /// <summary>
 /// Controller for managing actor information, death records, and filmography details
 /// </summary>
+[ApiController]
+[Route("api/[controller]")]
 public class ActorsController : ControllerBase
 {
     private readonly AppDbContext _context;
