@@ -65,3 +65,8 @@ UpgradeLog*.htm
 ServiceFabricBackup/
 *.rptproj.bak
 *.nupkg
+
+# Development settings
+appsettings.Development.json
+appsettings.*.json
+!appsettings.json
