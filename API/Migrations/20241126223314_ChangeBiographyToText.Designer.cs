@@ -3,6 +3,7 @@ using System;
 using DeathflixAPI.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DeathflixAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20241126223314_ChangeBiographyToText")]
+    partial class ChangeBiographyToText
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -39,12 +42,6 @@ namespace DeathflixAPI.Migrations
                     b.Property<DateTime?>("DateOfDeath")
                         .HasColumnType("date");
 
-                    b.Property<DateTime>("LastDeathCheck")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("LastDetailsCheck")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -53,9 +50,6 @@ namespace DeathflixAPI.Migrations
                     b.Property<string>("PlaceOfBirth")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
-
-                    b.Property<double>("Popularity")
-                        .HasColumnType("decimal(10,3)");
 
                     b.Property<string>("ProfileImagePath")
                         .HasMaxLength(200)
