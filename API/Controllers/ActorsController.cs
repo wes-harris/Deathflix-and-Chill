@@ -10,6 +10,9 @@ namespace DeathflixAPI.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+/// <summary>
+/// Controller for managing actor information, death records, and filmography details
+/// </summary>
 public class ActorsController : ControllerBase
 {
     private readonly AppDbContext _context;
@@ -26,8 +29,16 @@ public class ActorsController : ControllerBase
         _tmdbService = tmdbService;
     }
 
-    // GET: api/actors
+    /// <summary>
+    /// Retrieves a paginated list of all actors
+    /// </summary>
+    /// <param name="parameters">Pagination and sorting parameters for the actor list</param>
+    /// <returns>A paginated list of actors with sorting options</returns>
+    /// <response code="200">Returns the paginated list of actors</response>
+    /// <response code="500">If there was an internal server error</response>
     [HttpGet]
+    [ProducesResponseType(typeof(PagedResponse<Actor>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<PagedResponse<Actor>>> GetActors([FromQuery] ActorParameters parameters)
     {
         try
@@ -81,8 +92,19 @@ public class ActorsController : ControllerBase
             return StatusCode(500, "An error occurred while retrieving actors");
         }
     }
-    // GET: api/actors/5
+
+    /// <summary>
+    /// Retrieves a specific actor by their ID
+    /// </summary>
+    /// <param name="id">The unique identifier of the actor</param>
+    /// <returns>Detailed information about the specified actor</returns>
+    /// <response code="200">Returns the requested actor</response>
+    /// <response code="404">If the actor was not found</response>
+    /// <response code="500">If there was an internal server error</response>
     [HttpGet("{id}")]
+    [ProducesResponseType(typeof(Actor), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<Actor>> GetActor(int id)
     {
         try
@@ -108,8 +130,18 @@ public class ActorsController : ControllerBase
         }
     }
 
-    // POST: api/actors
+    /// <summary>
+    /// Creates a new actor record
+    /// </summary>
+    /// <param name="actor">The actor information to create</param>
+    /// <returns>The newly created actor record</returns>
+    /// <response code="201">Returns the newly created actor</response>
+    /// <response code="400">If the actor data is invalid</response>
+    /// <response code="500">If there was an internal server error</response>
     [HttpPost]
+    [ProducesResponseType(typeof(Actor), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<Actor>> CreateActor(Actor actor)
     {
         try
@@ -145,8 +177,21 @@ public class ActorsController : ControllerBase
         }
     }
 
-    // PUT: api/actors/5
+    /// <summary>
+    /// Updates an existing actor record
+    /// </summary>
+    /// <param name="id">The ID of the actor to update</param>
+    /// <param name="actor">The updated actor information</param>
+    /// <returns>No content if successful</returns>
+    /// <response code="204">If the actor was successfully updated</response>
+    /// <response code="400">If the ID doesn't match the actor's ID</response>
+    /// <response code="404">If the actor was not found</response>
+    /// <response code="500">If there was an internal server error</response>
     [HttpPut("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> UpdateActor(int id, Actor actor)
     {
         try
@@ -184,8 +229,18 @@ public class ActorsController : ControllerBase
         }
     }
 
-    // DELETE: api/actors/5
+    /// <summary>
+    /// Deletes an actor record
+    /// </summary>
+    /// <param name="id">The ID of the actor to delete</param>
+    /// <returns>No content if successful</returns>
+    /// <response code="204">If the actor was successfully deleted</response>
+    /// <response code="404">If the actor was not found</response>
+    /// <response code="500">If there was an internal server error</response>
     [HttpDelete("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> DeleteActor(int id)
     {
         try
@@ -210,8 +265,18 @@ public class ActorsController : ControllerBase
         }
     }
 
-    // GET: api/actors/{id}/details
+    /// <summary>
+    /// Retrieves detailed information about an actor including TMDB data
+    /// </summary>
+    /// <param name="id">The ID of the actor</param>
+    /// <returns>Combined actor details from local database and TMDB</returns>
+    /// <response code="200">Returns the detailed actor information</response>
+    /// <response code="404">If the actor was not found</response>
+    /// <response code="500">If there was an internal server error</response>
     [HttpGet("{id}/details")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<dynamic>> GetActorDetails(int id)
     {
         try
@@ -262,8 +327,20 @@ public class ActorsController : ControllerBase
         }
     }
 
-    // GET: api/actors/{id}/credits
+    /// <summary>
+    /// Retrieves an actor's movie credits from TMDB
+    /// </summary>
+    /// <param name="id">The ID of the actor</param>
+    /// <returns>List of movies the actor has appeared in</returns>
+    /// <response code="200">Returns the actor's movie credits</response>
+    /// <response code="404">If the actor was not found</response>
+    /// <response code="400">If there was an error retrieving from TMDB</response>
+    /// <response code="500">If there was an internal server error</response>
     [HttpGet("{id}/credits")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<dynamic>> GetActorCredits(int id)
     {
         try
@@ -289,11 +366,22 @@ public class ActorsController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Retrieves a paginated list of recently deceased actors
+    /// </summary>
+    /// <param name="parameters">Pagination and sorting parameters</param>
+    /// <param name="since">Optional start date to filter deaths</param>
+    /// <param name="until">Optional end date to filter deaths</param>
+    /// <returns>A paginated list of deceased actors</returns>
+    /// <response code="200">Returns the list of deceased actors</response>
+    /// <response code="500">If there was an internal server error</response>
     [HttpGet("deceased")]
+    [ProducesResponseType(typeof(PagedResponse<dynamic>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<PagedResponse<dynamic>>> GetRecentlyDeceasedActors(
-    [FromQuery] ActorParameters parameters,
-    [FromQuery] DateTime? since = null,
-    [FromQuery] DateTime? until = null)
+        [FromQuery] ActorParameters parameters,
+        [FromQuery] DateTime? since = null,
+        [FromQuery] DateTime? until = null)
     {
         try
         {
@@ -379,12 +467,28 @@ public class ActorsController : ControllerBase
         }
     }
 
-    // Search endpoint already has pagination through TMDB API, but let's make it consistent
+    /// <summary>
+    /// Searches for actors using the TMDB API
+    /// </summary>
+    /// <param name="query">The search query string</param>
+    /// <param name="parameters">Pagination and sorting parameters</param>
+    /// <param name="minPopularity">Minimum popularity score filter</param>
+    /// <returns>A paginated list of actors matching the search criteria</returns>
+    /// <response code="200">Returns the search results</response>
+    /// <response code="400">If the search query is empty</response>
+    /// <response code="404">If no actors were found</response>
+    /// <response code="429">If TMDB rate limit is exceeded</response>
+    /// <response code="500">If there was an internal server error</response>
     [HttpGet("search")]
+    [ProducesResponseType(typeof(PagedResponse<dynamic>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<PagedResponse<dynamic>>> SearchActors(
-    [FromQuery] string query,
-    [FromQuery] ActorParameters parameters,
-    [FromQuery] double? minPopularity = 5.0)
+        [FromQuery] string query,
+        [FromQuery] ActorParameters parameters,
+        [FromQuery] double? minPopularity = 5.0)
     {
         try
         {
@@ -457,92 +561,15 @@ public class ActorsController : ControllerBase
         }
     }
 
-    [HttpGet("filter-deaths")]
-    public async Task<ActionResult<PagedResponse<dynamic>>> FilterDeaths(
-    [FromQuery] ActorParameters parameters,
-    [FromQuery] DateTime? fromDate = null,
-    [FromQuery] DateTime? toDate = null)
-    {
-        try
-        {
-            _logger.LogInformation("Filtering actors by death criteria");
-
-            var query = _context.Actors
-                .Include(a => a.DeathRecord)
-                .Where(a => a.DateOfDeath.HasValue)
-                .AsQueryable();
-
-            // Apply date filters if provided
-            if (fromDate.HasValue)
-            {
-                var fromDateOnly = DateOnly.FromDateTime(fromDate.Value);
-                query = query.Where(a => a.DateOfDeath >= fromDateOnly);
-            }
-
-            if (toDate.HasValue)
-            {
-                var toDateOnly = DateOnly.FromDateTime(toDate.Value);
-                query = query.Where(a => a.DateOfDeath <= toDateOnly);
-            }
-
-            // Apply sorting
-            query = parameters.Sorting.SortBy.ToLower() switch
-            {
-                "name" => parameters.Sorting.Direction == SortDirection.Ascending
-                    ? query.OrderBy(a => a.Name)
-                    : query.OrderByDescending(a => a.Name),
-
-                "birthdate" => parameters.Sorting.Direction == SortDirection.Ascending
-                    ? query.OrderBy(a => a.DateOfBirth)
-                    : query.OrderByDescending(a => a.DateOfBirth),
-
-                "deathdate" => parameters.Sorting.Direction == SortDirection.Ascending
-                    ? query.OrderBy(a => a.DateOfDeath)
-                    : query.OrderByDescending(a => a.DateOfDeath),
-
-                "popularity" => parameters.Sorting.Direction == SortDirection.Ascending
-                    ? query.OrderBy(a => a.Popularity)
-                    : query.OrderByDescending(a => a.Popularity),
-
-                _ => query.OrderByDescending(a => a.DateOfDeath) // default sorting
-            };
-
-            var totalRecords = await query.CountAsync();
-
-            var results = await query
-                .Skip((parameters.Pagination.PageNumber - 1) * parameters.Pagination.PageSize)
-                .Take(parameters.Pagination.PageSize)
-                .Select(a => new
-                {
-                    a.Id,
-                    a.TmdbId,
-                    a.Name,
-                    a.ProfileImagePath,
-                    DateOfBirth = a.DateOfBirth,
-                    DateOfDeath = a.DateOfDeath,
-                    a.DeathRecord
-                })
-                .ToListAsync();
-
-            var pagedResponse = new PagedResponse<dynamic>
-            {
-                Data = results,
-                PageNumber = parameters.Pagination.PageNumber,
-                PageSize = parameters.Pagination.PageSize,
-                TotalRecords = totalRecords,
-                TotalPages = (int)Math.Ceiling(totalRecords / (double)parameters.Pagination.PageSize)
-            };
-
-            return Ok(pagedResponse);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error filtering actors by death criteria");
-            return StatusCode(500, "An error occurred while filtering actors");
-        }
-    }
-
+    /// <summary>
+    /// Tests the connection to the TMDB API
+    /// </summary>
+    /// <returns>A success message if the connection test passed</returns>
+    /// <response code="200">If the connection test was successful</response>
+    /// <response code="500">If the connection test failed</response>
     [HttpGet("test-tmdb")]
+    [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> TestTmdbConnection()
     {
         try
