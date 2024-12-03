@@ -15,4 +15,5 @@ public class TmdbActorResult
 
     [JsonPropertyName("known_for_department")]
     public string? KnownForDepartment { get; set; }
+    public double Popularity { get; internal set; }
 }

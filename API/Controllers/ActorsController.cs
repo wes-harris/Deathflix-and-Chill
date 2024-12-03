@@ -5,6 +5,7 @@ using DeathflixAPI.Models;
 using DeathflixAPI.Services;
 using DeathflixAPI.Exceptions;
 
+
 namespace DeathflixAPI.Controllers;
 
 [ApiController]
@@ -27,12 +28,52 @@ public class ActorsController : ControllerBase
 
     // GET: api/actors
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Actor>>> GetActors()
+    public async Task<ActionResult<PagedResponse<Actor>>> GetActors([FromQuery] ActorParameters parameters)
     {
         try
         {
-            _logger.LogInformation("Retrieving all actors");
-            return await _context.Actors.ToListAsync();
+            _logger.LogInformation("Retrieving actors with pagination and sorting");
+
+            var query = _context.Actors.AsQueryable();
+
+            // Apply sorting
+            query = parameters.Sorting.SortBy.ToLower() switch
+            {
+                "name" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.Name)
+                    : query.OrderByDescending(a => a.Name),
+
+                "birthdate" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.DateOfBirth)
+                    : query.OrderByDescending(a => a.DateOfBirth),
+
+                "deathdate" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.DateOfDeath)
+                    : query.OrderByDescending(a => a.DateOfDeath),
+
+                "popularity" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.Popularity)
+                    : query.OrderByDescending(a => a.Popularity),
+
+                _ => query.OrderBy(a => a.Name) // default sorting
+            };
+
+            var totalRecords = await query.CountAsync();
+            var actors = await query
+                .Skip((parameters.Pagination.PageNumber - 1) * parameters.Pagination.PageSize)
+                .Take(parameters.Pagination.PageSize)
+                .ToListAsync();
+
+            var pagedResponse = new PagedResponse<Actor>
+            {
+                Data = actors,
+                PageNumber = parameters.Pagination.PageNumber,
+                PageSize = parameters.Pagination.PageSize,
+                TotalRecords = totalRecords,
+                TotalPages = (int)Math.Ceiling(totalRecords / (double)parameters.Pagination.PageSize)
+            };
+
+            return Ok(pagedResponse);
         }
         catch (Exception ex)
         {
@@ -40,7 +81,6 @@ public class ActorsController : ControllerBase
             return StatusCode(500, "An error occurred while retrieving actors");
         }
     }
-
     // GET: api/actors/5
     [HttpGet("{id}")]
     public async Task<ActionResult<Actor>> GetActor(int id)
@@ -170,9 +210,181 @@ public class ActorsController : ControllerBase
         }
     }
 
-    // GET: api/actors/search
+    // GET: api/actors/{id}/details
+    [HttpGet("{id}/details")]
+    public async Task<ActionResult<dynamic>> GetActorDetails(int id)
+    {
+        try
+        {
+            var actor = await _context.Actors
+                .Include(a => a.DeathRecord)
+                .FirstOrDefaultAsync(a => a.Id == id);
+
+            if (actor == null)
+            {
+                _logger.LogWarning("Actor with ID {Id} not found in database", id);
+                return NotFound($"Actor with ID {id} not found");
+            }
+
+            try
+            {
+                // Get additional details from TMDB
+                var tmdbDetails = await _tmdbService.GetActorDetailsAsync(actor.TmdbId);
+
+                // Combine local and TMDB data
+                var result = new
+                {
+                    actor.Id,
+                    actor.TmdbId,
+                    actor.Name,
+                    Biography = tmdbDetails?.Biography,
+                    BirthDate = tmdbDetails?.Birthday,
+                    DeathDate = actor.DateOfDeath,
+                    PlaceOfBirth = tmdbDetails?.PlaceOfBirth,
+                    ProfileImagePath = tmdbDetails?.ProfilePath,
+                    DeathRecord = actor.DeathRecord,
+                    IsDeceased = actor.IsDeceased
+                };
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching TMDB details for actor {Id}", id);
+                // Return basic actor info if TMDB fetch fails
+                return Ok(actor);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving actor details for ID: {Id}", id);
+            return StatusCode(500, "An error occurred while retrieving actor details");
+        }
+    }
+
+    // GET: api/actors/{id}/credits
+    [HttpGet("{id}/credits")]
+    public async Task<ActionResult<dynamic>> GetActorCredits(int id)
+    {
+        try
+        {
+            var actor = await _context.Actors.FindAsync(id);
+            if (actor == null)
+            {
+                return NotFound($"Actor with ID {id} not found");
+            }
+
+            var credits = await _tmdbService.GetActorMovieCreditsAsync(actor.TmdbId);
+            return Ok(credits);
+        }
+        catch (TmdbApiException ex)
+        {
+            _logger.LogError(ex, "TMDB API error occurred while fetching credits for actor {Id}", id);
+            return StatusCode(400, "Error retrieving actor credits");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving credits for actor {Id}", id);
+            return StatusCode(500, "An error occurred while retrieving actor credits");
+        }
+    }
+
+    [HttpGet("deceased")]
+    public async Task<ActionResult<PagedResponse<dynamic>>> GetRecentlyDeceasedActors(
+    [FromQuery] ActorParameters parameters,
+    [FromQuery] DateTime? since = null,
+    [FromQuery] DateTime? until = null)
+    {
+        try
+        {
+            _logger.LogInformation("Retrieving recently deceased actors");
+
+            var query = _context.Actors
+                .Include(a => a.DeathRecord)
+                .Where(a => a.DateOfDeath.HasValue)
+                .AsQueryable();
+
+            // Apply date filters
+            if (since.HasValue)
+            {
+                var sinceDate = DateOnly.FromDateTime(since.Value);
+                query = query.Where(a => a.DateOfDeath.HasValue && a.DateOfDeath.Value >= sinceDate);
+            }
+
+            if (until.HasValue)
+            {
+                var untilDate = DateOnly.FromDateTime(until.Value);
+                query = query.Where(a => a.DateOfDeath.HasValue && a.DateOfDeath.Value <= untilDate);
+            }
+
+            // Apply sorting
+            query = parameters.Sorting.SortBy.ToLower() switch
+            {
+                "name" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.Name)
+                    : query.OrderByDescending(a => a.Name),
+
+                "birthdate" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.DateOfBirth)
+                    : query.OrderByDescending(a => a.DateOfBirth),
+
+                "deathdate" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.DateOfDeath)
+                    : query.OrderByDescending(a => a.DateOfDeath),
+
+                "popularity" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.Popularity)
+                    : query.OrderByDescending(a => a.Popularity),
+
+                _ => query.OrderByDescending(a => a.DateOfDeath) // default sorting for deceased
+            };
+
+            var totalRecords = await query.CountAsync();
+
+            var deceasedActors = await query
+                .Skip((parameters.Pagination.PageNumber - 1) * parameters.Pagination.PageSize)
+                .Take(parameters.Pagination.PageSize)
+                .Select(a => new
+                {
+                    a.Id,
+                    a.TmdbId,
+                    a.Name,
+                    a.ProfileImagePath,
+                    DateOfBirth = a.DateOfBirth,
+                    DateOfDeath = a.DateOfDeath,
+                    DeathRecord = a.DeathRecord == null ? null : new
+                    {
+                        AdditionalDetails = a.DeathRecord.AdditionalDetails,
+                        SourceUrl = a.DeathRecord.SourceUrl,
+                        LastVerified = a.DeathRecord.LastVerified
+                    }
+                })
+                .ToListAsync();
+
+            var pagedResponse = new PagedResponse<dynamic>
+            {
+                Data = deceasedActors,
+                PageNumber = parameters.Pagination.PageNumber,
+                PageSize = parameters.Pagination.PageSize,
+                TotalRecords = totalRecords,
+                TotalPages = (int)Math.Ceiling(totalRecords / (double)parameters.Pagination.PageSize)
+            };
+
+            return Ok(pagedResponse);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving recently deceased actors");
+            return StatusCode(500, "An error occurred while retrieving deceased actors");
+        }
+    }
+
+    // Search endpoint already has pagination through TMDB API, but let's make it consistent
     [HttpGet("search")]
-    public async Task<ActionResult<IEnumerable<Actor>>> SearchActors([FromQuery] string query)
+    public async Task<ActionResult<PagedResponse<dynamic>>> SearchActors(
+    [FromQuery] string query,
+    [FromQuery] ActorParameters parameters,
+    [FromQuery] double? minPopularity = 5.0)
     {
         try
         {
@@ -181,7 +393,8 @@ public class ActorsController : ControllerBase
                 return BadRequest("Search query is required");
             }
 
-            _logger.LogInformation("Searching for actors with query: {Query}", query);
+            _logger.LogInformation("Searching for actors with query: {Query}, page: {Page}",
+                query, parameters.Pagination.PageNumber);
 
             var searchResult = await _tmdbService.SearchActorsAsync(query);
             if (searchResult?.Results == null || !searchResult.Results.Any())
@@ -189,34 +402,146 @@ public class ActorsController : ControllerBase
                 return NotFound("No actors found matching the search criteria");
             }
 
-            // Here you would typically convert TMDB results to your Actor model
-            // This is a simplified example
-            var actors = searchResult.Results.Select(r => new Actor
-            {
-                TmdbId = r.Id,
-                Name = r.Name,
-                ProfileImagePath = r.ProfilePath
-            });
+            // Filter by popularity if specified
+            var filteredResults = minPopularity.HasValue
+                ? searchResult.Results.Where(r => r.Popularity >= minPopularity.Value)
+                : searchResult.Results;
 
-            return Ok(actors);
+            // Apply sorting
+            var sortedResults = parameters.Sorting.SortBy.ToLower() switch
+            {
+                "name" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? filteredResults.OrderBy(r => r.Name)
+                    : filteredResults.OrderByDescending(r => r.Name),
+
+                "popularity" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? filteredResults.OrderBy(r => r.Popularity)
+                    : filteredResults.OrderByDescending(r => r.Popularity),
+
+                _ => filteredResults.OrderByDescending(r => r.Popularity) // default sorting
+            };
+
+            // Apply pagination
+            var pagedResults = sortedResults
+                .Skip((parameters.Pagination.PageNumber - 1) * parameters.Pagination.PageSize)
+                .Take(parameters.Pagination.PageSize)
+                .Select(r => new
+                {
+                    r.Id,
+                    r.Name,
+                    r.ProfilePath,
+                    r.Popularity,
+                    IsTracked = _context.Actors.Any(a => a.TmdbId == r.Id)
+                });
+
+            var pagedResponse = new PagedResponse<dynamic>
+            {
+                Data = pagedResults,
+                PageNumber = parameters.Pagination.PageNumber,
+                PageSize = parameters.Pagination.PageSize,
+                TotalRecords = searchResult.TotalResults,
+                TotalPages = searchResult.TotalPages
+            };
+
+            return Ok(pagedResponse);
         }
         catch (TmdbApiException ex) when (ex.StatusCode == 429)
         {
             _logger.LogWarning(ex, "TMDB API rate limit exceeded");
             return StatusCode(429, "Search service is temporarily unavailable. Please try again later.");
         }
-        catch (TmdbApiException ex)
+        catch (Exception ex)
         {
-            _logger.LogError(ex, "TMDB API error occurred during search");
-            return StatusCode(400, "Error communicating with search service");
+            _logger.LogError(ex, "Error occurred during actor search: {Error}", ex.Message);
+            return StatusCode(500, "An error occurred while searching for actors");
+        }
+    }
+
+    [HttpGet("filter-deaths")]
+    public async Task<ActionResult<PagedResponse<dynamic>>> FilterDeaths(
+    [FromQuery] ActorParameters parameters,
+    [FromQuery] DateTime? fromDate = null,
+    [FromQuery] DateTime? toDate = null)
+    {
+        try
+        {
+            _logger.LogInformation("Filtering actors by death criteria");
+
+            var query = _context.Actors
+                .Include(a => a.DeathRecord)
+                .Where(a => a.DateOfDeath.HasValue)
+                .AsQueryable();
+
+            // Apply date filters if provided
+            if (fromDate.HasValue)
+            {
+                var fromDateOnly = DateOnly.FromDateTime(fromDate.Value);
+                query = query.Where(a => a.DateOfDeath >= fromDateOnly);
+            }
+
+            if (toDate.HasValue)
+            {
+                var toDateOnly = DateOnly.FromDateTime(toDate.Value);
+                query = query.Where(a => a.DateOfDeath <= toDateOnly);
+            }
+
+            // Apply sorting
+            query = parameters.Sorting.SortBy.ToLower() switch
+            {
+                "name" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.Name)
+                    : query.OrderByDescending(a => a.Name),
+
+                "birthdate" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.DateOfBirth)
+                    : query.OrderByDescending(a => a.DateOfBirth),
+
+                "deathdate" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.DateOfDeath)
+                    : query.OrderByDescending(a => a.DateOfDeath),
+
+                "popularity" => parameters.Sorting.Direction == SortDirection.Ascending
+                    ? query.OrderBy(a => a.Popularity)
+                    : query.OrderByDescending(a => a.Popularity),
+
+                _ => query.OrderByDescending(a => a.DateOfDeath) // default sorting
+            };
+
+            var totalRecords = await query.CountAsync();
+
+            var results = await query
+                .Skip((parameters.Pagination.PageNumber - 1) * parameters.Pagination.PageSize)
+                .Take(parameters.Pagination.PageSize)
+                .Select(a => new
+                {
+                    a.Id,
+                    a.TmdbId,
+                    a.Name,
+                    a.ProfileImagePath,
+                    DateOfBirth = a.DateOfBirth,
+                    DateOfDeath = a.DateOfDeath,
+                    a.DeathRecord
+                })
+                .ToListAsync();
+
+            var pagedResponse = new PagedResponse<dynamic>
+            {
+                Data = results,
+                PageNumber = parameters.Pagination.PageNumber,
+                PageSize = parameters.Pagination.PageSize,
+                TotalRecords = totalRecords,
+                TotalPages = (int)Math.Ceiling(totalRecords / (double)parameters.Pagination.PageSize)
+            };
+
+            return Ok(pagedResponse);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error occurred during actor search");
-            return StatusCode(500, "An unexpected error occurred");
+            _logger.LogError(ex, "Error filtering actors by death criteria");
+            return StatusCode(500, "An error occurred while filtering actors");
         }
-
     }
+
     [HttpGet("test-tmdb")]
     public async Task<IActionResult> TestTmdbConnection()
     {

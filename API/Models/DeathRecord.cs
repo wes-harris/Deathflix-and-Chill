@@ -14,12 +14,6 @@ public class DeathRecord
     [DataType(DataType.Date)]
     public DateOnly DateOfDeath { get; set; }
 
-    [StringLength(200)]
-    public string? CauseOfDeath { get; set; }
-
-    [StringLength(200)]
-    public string? PlaceOfDeath { get; set; }
-
     [StringLength(1000)]
     public string? AdditionalDetails { get; set; }
 
